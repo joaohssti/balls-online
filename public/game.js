@@ -1,6 +1,11 @@
-const GRID_SIZE = 50; // Size of each grid cell in pixels
-const GRID_COLOR = 'darkgray'; // Light gray grid lines
+// background grid
+const GRID_SIZE = 50;
+const GRID_COLOR = 'darkgray';
 const GRID_LINE_WIDTH = 1;
+
+// boundary
+const boundaryColor = '#333';
+const boundaryWidth = 50;
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -10,8 +15,12 @@ const viewport = {
   width: canvas.width,
   height: canvas.height
 };
-const boundaryColor = '#333';
-const boundaryWidth = 50; // Width of the boundary area
+
+// start menu
+const startMenu = document.getElementById('startMenu');
+const nicknameInput = document.getElementById('nicknameInput');
+const startButton = document.getElementById('startButton');
+const gameCanvas = document.getElementById('gameCanvas');
 
 // Set canvas to full window size
 canvas.width = window.innerWidth;
@@ -21,6 +30,7 @@ canvas.height = window.innerHeight;
 let players = {};
 let myId = null;
 let settings = {};
+let socket = null; // Will be initialized after nickname is entered
 const keys = {
   ArrowUp: false,
   ArrowDown: false,
@@ -28,77 +38,114 @@ const keys = {
   ArrowRight: false
 };
 
-// Connect to server
-const socket = io();
+// Hide canvas initially
+gameCanvas.classList.add('hidden');
 
-// Handle initialization
-socket.on('init', (data) => {
-  myId = data.playerId;
-  settings = data.settings;
-  players = data.players;
-});
-
-// Handle new players
-socket.on('newPlayer', (data) => {
-  players[data.id] = data.player;
-});
-
-// Handle player disconnections
-socket.on('playerDisconnected', (id) => {
-  delete players[id];
-});
-
-// Handle game updates
-socket.on('update', (updatedPlayers) => {
-  players = updatedPlayers;
-});
-
-// Keyboard input
-window.addEventListener('keydown', (e) => {
-  switch(e.key) {
-    case 'ArrowUp':
-    case 'w':
-      keys.ArrowUp = true;
-      break;
-    case 'ArrowDown':
-    case 's':
-      keys.ArrowDown = true;
-      break;
-    case 'ArrowLeft':
-    case 'a':
-      keys.ArrowLeft = true;
-      break;
-    case 'ArrowRight':
-    case 'd':
-      keys.ArrowRight = true;
-      break;
+// Handle start button click
+startButton.addEventListener('click', () => {
+  const nickname = nicknameInput.value.trim();
+  
+  if (nickname.length < 1) {
+    alert('Please enter a nickname!');
+    return;
   }
-  updateMovement();
+  
+  // Hide menu and show game
+  startMenu.classList.add('hidden');
+  gameCanvas.classList.remove('hidden');
+  
+  // Initialize connection to server
+  initializeGame(nickname);
 });
 
-window.addEventListener('keyup', (e) => {
-  switch(e.key) {
-    case 'ArrowUp':
-    case 'w':
-      keys.ArrowUp = false;
-      break;
-    case 'ArrowDown':
-    case 's':
-      keys.ArrowDown = false;
-      break;
-    case 'ArrowLeft':
-    case 'a':
-      keys.ArrowLeft = false;
-      break;
-    case 'ArrowRight':
-    case 'd':
-      keys.ArrowRight = false;
-      break;
-  }
-  updateMovement();
-});
+function initializeGame(nickname) {
+  // Connect to server
+  socket = io();
+
+  // Handle initialization
+  socket.on('init', (data) => {
+    myId = data.playerId;
+    settings = data.settings;
+    players = data.players;
+    
+    // Send nickname to server
+    socket.emit('setNickname', nickname);
+    
+    // Start the game loop
+    render();
+  });
+
+  // Handle new players
+  socket.on('newPlayer', (data) => {
+    players[data.id] = data.player;
+  });
+
+  // Handle player disconnections
+  socket.on('playerDisconnected', (id) => {
+    delete players[id];
+  });
+
+  // Handle game updates
+  socket.on('update', (updatedPlayers) => {
+    players = updatedPlayers;
+  });
+
+  // Handle nickname updates
+  socket.on('playerUpdate', (data) => {
+    if (players[data.id]) {
+      players[data.id].nickname = data.player.nickname;
+    }
+  });
+
+  // Keyboard input
+  window.addEventListener('keydown', (e) => {
+    switch(e.key) {
+      case 'ArrowUp':
+      case 'w':
+        keys.ArrowUp = true;
+        break;
+      case 'ArrowDown':
+      case 's':
+        keys.ArrowDown = true;
+        break;
+      case 'ArrowLeft':
+      case 'a':
+        keys.ArrowLeft = true;
+        break;
+      case 'ArrowRight':
+      case 'd':
+        keys.ArrowRight = true;
+        break;
+    }
+    updateMovement();
+  });
+
+  window.addEventListener('keyup', (e) => {
+    switch(e.key) {
+      case 'ArrowUp':
+      case 'w':
+        keys.ArrowUp = false;
+        break;
+      case 'ArrowDown':
+      case 's':
+        keys.ArrowDown = false;
+        break;
+      case 'ArrowLeft':
+      case 'a':
+        keys.ArrowLeft = false;
+        break;
+      case 'ArrowRight':
+      case 'd':
+        keys.ArrowRight = false;
+        break;
+    }
+    updateMovement();
+  });
+}
 
 function drawGrid() {
+  if (!settings.width || !settings.height) return;
+  
   ctx.strokeStyle = GRID_COLOR;
   ctx.lineWidth = GRID_LINE_WIDTH;
   
@@ -123,8 +170,9 @@ function drawGrid() {
   }
 }
 
-// Calculate movement based on keys
 function updateMovement() {
+  if (!socket) return;
+  
   let dx = 0;
   let dy = 0;
   
@@ -144,6 +192,8 @@ function updateMovement() {
 }
 
 function drawBoundaries() {
+  if (!settings.width || !settings.height) return;
+  
   ctx.fillStyle = boundaryColor;
   // Left boundary
   ctx.fillRect(-viewport.x, -viewport.y, boundaryWidth, settings.height);
@@ -171,12 +221,13 @@ function drawPlayers() {
     ctx.strokeStyle = '#333';
     ctx.stroke();
     
-    // Draw player ID
+    // Draw player nickname or ID
+    const displayName = player.nickname || id.substring(0, 5);
     ctx.fillStyle = '#000';
     ctx.font = '12px Arial';
     ctx.textAlign = 'center';
     ctx.fillText(
-      id.substring(0, 5),
+      displayName,
       player.x - viewport.x,
       player.y - viewport.y + player.radius + 15
     );
@@ -199,23 +250,20 @@ function render() {
     viewport.y = Math.max(0, Math.min(settings.height - canvas.height, viewport.y));
   }
   
-  // Draw grid first (background)
   drawGrid();
-  
-  // Then draw boundaries (if you're keeping them)
   drawBoundaries();
-  
-  // Then draw all players
   drawPlayers();
   
   requestAnimationFrame(render);
 }
 
-// Start render loop
-render();
-
 // Handle window resize
 window.addEventListener('resize', () => {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
+});
+
+// Focus nickname input when page loads
+window.addEventListener('load', () => {
+  nicknameInput.focus();
 });
