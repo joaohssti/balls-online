@@ -93,7 +93,7 @@ function initializeGame(nickname) {
   // Handle nickname updates
   socket.on('playerUpdate', (data) => {
     if (players[data.id]) {
-      players[data.id].nickname = data.player.nickname;
+      players[data.id].nickname = { ...players[data.id], ...data.player };
     }
   });
 

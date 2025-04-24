@@ -43,6 +43,16 @@ io.on('connection', (socket) => {
     players 
   });
   
+  // Handle nickname setting
+  socket.on('setNickname', (nickname) => {
+    players[socket.id].nickname = nickname.substring(0, 12); // Limit to 12 chars
+    // Broadcast the updated player info to everyone
+    io.emit('playerUpdate', { 
+      id: socket.id, 
+      player: players[socket.id] 
+    });
+  });
+
   socket.broadcast.emit('newPlayer', { 
     id: socket.id, 
     player: players[socket.id] 
