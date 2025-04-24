@@ -10,8 +10,9 @@ const io = socketio(server);
 // Game state
 const players = {};
 const settings = {
-  width: 1920,
-  height: 1080
+  width: 2000,
+  height: 2000,
+  boundaryWidth: 50 // Match client boundary width
 };
 
 // Serve static files from public directory
@@ -65,8 +66,21 @@ io.on('connection', (socket) => {
 function update() {
   for (const id in players) {
     const player = players[id];
-    player.x = Math.max(player.radius, Math.min(settings.width - player.radius, player.x + player.dx * player.speed));
-    player.y = Math.max(player.radius, Math.min(settings.height - player.radius, player.y + player.dy * player.speed));
+    // Calculate new position with boundaries
+    player.x = Math.max(
+      player.radius + settings.boundaryWidth,
+      Math.min(
+        settings.width - player.radius - settings.boundaryWidth,
+        player.x + player.dx * player.speed
+      )
+    );
+    player.y = Math.max(
+      player.radius + settings.boundaryWidth,
+      Math.min(
+        settings.height - player.radius - settings.boundaryWidth,
+        player.y + player.dy * player.speed
+      )
+    );
   }
   io.emit('update', players);
 }
