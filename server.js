@@ -10,8 +10,8 @@ const io = socketio(server);
 // Game state
 const players = {};
 const settings = {
-  width: 2000,
-  height: 2000,
+  width: 3000,
+  height: 3000,
   boundaryWidth: 50 // Match client boundary width
 };
 
@@ -102,7 +102,7 @@ function getRandomColor() {
 }
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '10.1.1.139', () => {
+server.listen(PORT, '10.1.1.89', () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log(`Local network access: http://${getLocalIpAddress()}:${PORT}`);
     console.log(`Static files being served from: ${path.join(__dirname, 'public')}`);
